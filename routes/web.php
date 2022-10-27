@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ThreadController;
+use App\Http\Controllers\ReplyController; 
 
 /*
 |--------------------------------------------------------------------------
@@ -14,5 +15,14 @@ use App\Http\Controllers\ThreadController;
 |
 */
 
-Route::redirect('/', '/message');
-Route::resource('/message', ThreadController::class);
+Route::redirect('/', '/thread')->name('home');
+
+Route::resource('thread', ThreadController::class)->only([
+    'index', 'store', 'destroy'
+]);
+
+Route::post('/thread/search', [ThreadController::class, 'search'])->name('thread.search');
+
+Route::resource('/reply', ReplyController::class)->only([
+    'store'
+]);

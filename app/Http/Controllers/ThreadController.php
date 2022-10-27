@@ -3,87 +3,72 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cookie;
 use App\Models\Thread;
-
 
 class ThreadController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index()
+    public function index(Request $request)
     {
-        $threads = Thread::all();
+        // Cookieを変数に読み込み
+        $user = [
+            'name' => Cookie::get('message-app_name'),
+            'identifier' => Cookie::get('message-app_identifier'),
+        ];
 
-        //掲示板ページの表示
-        return view('message/index', compact('threads'));
+        // Cookieが存在しなければデフォルト値を設定
+        if ($user['name'] === null) {
+            
+            $user = [
+                'name' => 'Guest',
+                'identifier' => Str::random(20),
+            ];
+
+            Cookie::queue(Cookie::forever('message-app_name', $user['name']));
+            Cookie::queue(Cookie::forever('message_identifier', $user['identifier']));
+        }
+
+        // スレッド情報を取得して代入（最新情報を上位に表示）
+        $threads = Thread::orderBy('created_at', 'desc')->Paginate(5);
+
+        // 掲示板ページを表示
+        return view('message/index', compact('threads', 'user'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
     public function store(Request $request)
     {
-        //
+        // フォームで入力されたユーザー名をキャッシュに登録
+        Cookie::queue(Cookie::forever('message-app_name', $request->user_name));
+
+        // フォームに入力されたスレッド情報をデータベースへ登録
+        $threads = new Thread;
+        $form = $request->all();
+        $threads->timestamps = false;
+        $threads->fill($form)->save();
+
+        // 掲示板ページへリダイレクト
+        return redirect(route('home'));
     }
 
-    /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function edit($id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
     public function destroy($id)
     {
-        //
+        // スレッド情報をデータベースから削除
+        $thread = Thread::find($id)->delete();
+
+        // 掲示板ページへリダイレクト
+        return redirect(route('home'));
+    }
+
+    public function search(Request $request)
+    {
+        // 検索フォームに入力された単語のエスケープ処理
+        $search_message = '%' . addcslashes($request->search_message, '%_\\') . '%';
+
+        // 検索フォームに入力された単語でLIKE検索した結果のスレッド情報を取得して代入（最新情報を上位に表示）
+        $threads = Thread::where('message', 'LIKE', $search_message)->orderBy('created_at', 'desc')->Paginate(5);
+
+        // 掲示板ページを表示
+        return view('message.index', compact('threads'));
     }
 }
